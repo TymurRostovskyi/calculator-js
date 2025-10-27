@@ -1,127 +1,231 @@
-// ===== SELECT ELEMENTS =====
-const display = document.getElementById("display");
-const smallDisplay = document.getElementById("smallDisplay");
-const buttons = document.querySelectorAll(".btn");
-const themeButton = document.getElementById("themeButton");
-const body = document.body;
+// script.js (updated)
+// Elements
+const resultEl = document.getElementById("result");
+const operationEl = document.getElementById("operation");
+const themeBtn = document.getElementById("theme-btn");
 
-let currentInput = "0";
-let previousInput = "";
-let operator = null;
-let isDark = false;
-let waitingForSecondNumber = false;
+// State
+let current = "";           // what user types now (string)
+let previous = "";          // previous value (string)
+let operator = null;        // 'add' | 'subtract' | 'multiply' | 'divide' | null
+let darkMode = false;
 
-// ===== BUTTON LOGIC =====
-buttons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const action = btn.getAttribute("data-action");
+let percentDisplay = false; // whether current was converted by pressing %
+let percentRaw = "";        // original percent input (e.g. "20" from "20%")
 
-    if (!isNaN(action) || action === ".") {
-      handleNumber(action);
-    } else if (["+", "-", "*", "/"].includes(action)) {
-      handleOperator(action);
-    } else if (action === "=") {
-      calculate();
-    } else if (action === "clear") {
-      clearAll();
-    } else if (action === "backspace") {
-      backspace();
-    } else if (action === "%") {
-      handlePercent();
-    } else if (action === "+/-") {
-      toggleSign();
+// helper: map internal operator to symbol
+const opSymbol = {
+  add: "+",
+  subtract: "−",
+  multiply: "×",
+  divide: "÷"
+};
+
+const updateOperationDisplay = () => {
+  if (previous && operator) {
+    const symbol = opSymbol[operator] || "";
+    if (percentDisplay && percentRaw !== "") {
+      // show original percent with % sign
+      operationEl.textContent = `${previous} ${symbol} ${percentRaw}%`;
+    } else {
+      operationEl.textContent = `${previous} ${symbol}`;
+    }
+  } else {
+    operationEl.textContent = "";
+  }
+};
+
+const updateResultDisplay = () => {
+  // show current or 0
+  resultEl.textContent = current || "0";
+};
+
+const updateDisplay = () => {
+  updateOperationDisplay();
+  updateResultDisplay();
+};
+
+// clear all
+const clearAll = () => {
+  current = "";
+  previous = "";
+  operator = null;
+  percentDisplay = false;
+  percentRaw = "";
+  updateDisplay();
+};
+
+// number input
+const handleNumber = (num) => {
+  // if percent was active previously, entering a number resets percent state
+  if (percentDisplay) {
+    percentDisplay = false;
+    percentRaw = "";
+  }
+
+  if (num === "." && current.includes(".")) return;
+  // if current is result of a complete calculation and no operator yet, allow append (like normal)
+  current = current === "0" && num !== "." ? num : current + num;
+  updateDisplay();
+};
+
+// when an operator is pressed (+ - × ÷)
+const handleOperator = (op) => {
+  // If no current and there is previous (allow changing operator)
+  if (!current && previous) {
+    operator = op;
+    percentDisplay = false;
+    percentRaw = "";
+    updateDisplay();
+    return;
+  }
+
+  // If we already have previous and operator and current -> perform previous calculation first
+  if (previous && operator && current) {
+    calculate(); // this will move result into current
+  }
+
+  // Move current to previous and set operator
+  if (current) {
+    previous = current;
+    current = "";
+  }
+  operator = op;
+  percentDisplay = false;
+  percentRaw = "";
+  updateDisplay();
+};
+
+// percent handling
+const handlePercent = () => {
+  if (!current) return;
+
+  // If there's a previous value and an operator (e.g., 100 + 20 %)
+  if (previous && operator) {
+    // compute percent relative to previous for add/subtract, and relative semantics for multiply/divide:
+    const prevNum = parseFloat(previous);
+    const curNum = parseFloat(current);
+    if (isNaN(prevNum) || isNaN(curNum)) return;
+
+    // For add/subtract, % means prev * cur / 100 (so that 100 + 20% → 100 + 20)
+    // For multiply/divide, it's natural to treat current as percent of 1 => cur/100 (100 × 20% = 20)
+    let percentValue;
+    if (operator === "add" || operator === "subtract") {
+      percentValue = (prevNum * curNum) / 100;
+    } else {
+      // multiply or divide
+      percentValue = (curNum) / 100 * (operator === "multiply" ? prevNum : 1); 
+      // For multiply we might want prev * (cur/100) — but we leave standard flow:
+      // We'll set current to curNum/100 so that calculate() interprets it correctly.
+    }
+
+    // Save the raw percent typed for display (e.g. "20")
+    percentRaw = String(curNum);
+    // Use percentDisplay flag to show "20%" in operation area
+    percentDisplay = true;
+
+    // For add/subtract: set current to the computed percentValue (so calculate will do prev + current)
+    if (operator === "add" || operator === "subtract") {
+      current = String(percentValue);
+    } else {
+      // For multiply/divide, set current to curNum/100 so calculation uses prev * (cur/100)
+      current = String(curNum / 100);
     }
 
     updateDisplay();
-  });
-});
-
-function handleNumber(num) {
-  if (waitingForSecondNumber) {
-    currentInput = num === "." ? "0." : num;
-    waitingForSecondNumber = false;
-  } else {
-    if (currentInput === "0" && num !== ".") {
-      currentInput = num;
-    } else {
-      if (num === "." && currentInput.includes(".")) return;
-      currentInput += num;
-    }
+    return;
   }
-}
 
-function handleOperator(op) {
-  if (operator && !waitingForSecondNumber) {
-    calculate();
-  }
-  previousInput = currentInput;
-  operator = op;
-  waitingForSecondNumber = true;
-}
+  // If no previous/operator — simply divide the current by 100 (turn into percentage)
+  const cur = parseFloat(current);
+  if (isNaN(cur)) return;
+  percentRaw = String(cur);
+  percentDisplay = true;
+  current = String(cur / 100);
+  updateDisplay();
+};
 
-function calculate() {
-  if (!operator || waitingForSecondNumber) return;
+// calculate based on operator
+const calculate = () => {
+  if (!operator || !previous || current === "") return;
 
-  const prev = parseFloat(previousInput);
-  const curr = parseFloat(currentInput);
+  const a = parseFloat(previous);
+  const b = parseFloat(current);
+  if (isNaN(a) || isNaN(b)) return;
+
   let result;
 
   switch (operator) {
-    case "+": result = prev + curr; break;
-    case "-": result = prev - curr; break;
-    case "*": result = prev * curr; break;
-    case "/": result = curr !== 0 ? prev / curr : "Error"; break;
+    case "add":
+      result = a + b;
+      break;
+    case "subtract":
+      result = a - b;
+      break;
+    case "multiply":
+      result = a * b;
+      break;
+    case "divide":
+      result = b === 0 ? "Error" : a / b;
+      break;
+    default:
+      return;
   }
 
-  currentInput = result.toString();
+  // After calculation, clear previous/operator, show result in current
+  current = String(result);
+  previous = "";
   operator = null;
-  previousInput = "";
-  waitingForSecondNumber = false;
-}
+  // computed result is not a percent entry anymore
+  percentDisplay = false;
+  percentRaw = "";
+  updateDisplay();
+};
 
-function handlePercent() {
-  if (previousInput && operator) {
-    currentInput = (parseFloat(previousInput) * parseFloat(currentInput) / 100).toString();
-  } else {
-    currentInput = (parseFloat(currentInput) / 100).toString();
-  }
-}
+// sign change
+const toggleSign = () => {
+  if (!current) return;
+  const n = parseFloat(current);
+  if (isNaN(n)) return;
+  current = String(n * -1);
+  // percent flag resets because value changed
+  percentDisplay = false;
+  percentRaw = "";
+  updateDisplay();
+};
 
-function toggleSign() {
-  if (currentInput === "0") return;
-  currentInput = (parseFloat(currentInput) * -1).toString();
-}
+// wire buttons
+document.querySelectorAll(".btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const number = btn.dataset.number;
+    const action = btn.dataset.action;
 
-function backspace() {
-  currentInput = currentInput.slice(0, -1) || "0";
-}
+    if (number !== undefined) {
+      handleNumber(number);
+      return;
+    }
 
-function clearAll() {
-  currentInput = "0";
-  previousInput = "";
-  operator = null;
-  waitingForSecondNumber = false;
-}
-
-// ===== UPDATE DISPLAY =====
-function updateDisplay() {
-  display.textContent = currentInput;
-  smallDisplay.textContent = previousInput && operator
-    ? `${previousInput} ${operator}`
-    : "";
-}
-
-// ===== THEME TOGGLE =====
-themeButton.addEventListener("click", () => {
-  isDark = !isDark;
-  body.classList.toggle("dark", isDark);
-  body.classList.toggle("light", !isDark);
-
-  themeButton.textContent = isDark
-    ? "Switch to Light Mode"
-    : "Switch to Dark Mode";
+    switch (action) {
+      case "clear": clearAll(); break;
+      case "sign": toggleSign(); break;
+      case "percent": handlePercent(); break;
+      case "equals": calculate(); break;
+      case "add":
+      case "subtract":
+      case "multiply":
+      case "divide":
+        handleOperator(action); break;
+      default: break;
+    }
+  });
 });
 
-// Default light theme
-body.classList.add("light");
-updateDisplay();
+// theme toggle (unchanged)
+themeBtn.addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+  darkMode = !darkMode;
+  themeBtn.textContent = darkMode ? "Switch to Light Mode" : "Switch to Dark Mode";
+});
+
+// init
+clearAll();
