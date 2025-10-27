@@ -5,7 +5,7 @@ Supports **trigonometry**, **roots**, **percentages**, **power**, and **logarith
 Includes **dark mode**, **responsive design**, and **error handling**.
 
 ## Live Demo
-
+https://tymurrostovskyi.github.io/calculator-js/
 
 > Open in any browser — no installation needed!
 
