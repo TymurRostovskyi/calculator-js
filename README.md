@@ -1,7 +1,7 @@
 # Advanced JavaScript Calculator
 
-A **scientific calculator** built with **Vanilla JavaScript**, **HTML5**, and **CSS3**.  
-Supports **trigonometry**, **roots**, **percentages**, **power**, and **logarithms**.  
+A **elegant calculator** built with **Vanilla JavaScript**, **HTML5**, and **CSS3**.  
+Supports , **percentages**.  
 Includes **dark mode**, **responsive design**, and **error handling**.
 
 ## Live Demo
@@ -12,12 +12,7 @@ https://tymurrostovskyi.github.io/calculator-js/
 ## Features
 - **Basic operations**: `+`, `−`, `×`, `÷`
 - **Scientific functions**:
-  - `√` (square root)
-  - `sin()`, `cos()` (in degrees)
   - `%` (percentage)
-  - `x²` (power)
-  - `log()` (logarithm base 10)
-  - `π` (pi constant)
 - **Dark / Light mode toggle**
 - **Fully responsive** (mobile, tablet, desktop)
 - **Error handling** (prevents crashes)
